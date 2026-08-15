@@ -1,0 +1,25 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+.DS_Store
+
+# local data & heavy artifacts
+*.jsonl.zst
+*.jsonl
+outputs/
+models/
+checkpoints/
+*.pt
+*.bin
+*.gguf
+
+# IDE
+.idea/
+.vscode/

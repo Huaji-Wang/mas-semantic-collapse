@@ -1,0 +1,67 @@
+# Phase-1 defaults — all knobs are overridable via CLI
+
+project:
+  name: mas-semantic-collapse
+  seed: 42
+
+data:
+  threads_path: ../threads_2026-01_to_2026-05.jsonl.zst
+  min_comments: 50
+  max_comments: 1000  # drop mega-threads before labeling
+  linearize: toplevel_then_time
+
+windowing:
+  window_size: 10
+  late_windows: 3
+  # mean_comments: embed each comment, then mean-pool inside the window
+  # concat: join 10 comments into one long string then embed (long sequences; laptop GPU unsafe)
+  window_pool: mean_comments
+
+labeling:
+  high_quantile: 0.80
+  low_quantile: 0.20
+  compute_slope: true
+
+
+embedding:
+  backend: bge_m3
+  model_name: BAAI/bge-m3
+  openai_model: text-embedding-3-large
+  # This laptop's RTX 4070 8GB (also drives the display) reboots under CUDA labeling.
+  # Stay on CPU until another machine is available. Override with --device if needed.
+  batch_size: 32
+  device: cpu
+
+metrics:
+  compute:
+    - s_end
+    - t_tau
+    - vendi
+    - slope
+    - lexical
+  tau: null
+  vendi_sample_size: 30
+  vendi_repeats: 20
+
+simulation:
+  generator: deepseek
+  model: deepseek-chat
+  base_url: https://api.deepseek.com
+  temperature: 0.9
+  max_tokens: 200
+  n_agents: 3
+  persona: minimal
+  context: full
+  speaking_order: round_robin
+  structure: flat
+  weak_tree_reply_prob: 0.25
+  protocol: both
+  prefix_k: 10
+  max_comments: 100
+  n_per_class: 50
+  n_runs: 1
+
+paths:
+  outputs: outputs
+  labels: outputs/labels
+  sims: outputs/sims
