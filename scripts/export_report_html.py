@@ -1,7 +1,8 @@
-"""Export docs/phase1_status_report.md to a self-contained HTML (images inlined)."""
+"""Export a report markdown file to a self-contained HTML (images inlined)."""
 
 from __future__ import annotations
 
+import argparse
 import base64
 import mimetypes
 import re
@@ -10,8 +11,8 @@ from pathlib import Path
 from markdown_it import MarkdownIt
 
 ROOT = Path(__file__).resolve().parents[1]
-MD_PATH = ROOT / "docs" / "phase1_status_report.md"
-HTML_PATH = ROOT / "docs" / "phase1_status_report.html"
+DEFAULT_MD = ROOT / "docs" / "phase1_status_report.md"
+DEFAULT_HTML = ROOT / "docs" / "phase1_status_report.html"
 FIG_DIR = ROOT / "docs" / "figures"
 
 IMG_RE = re.compile(r"!\[([^\]]*)\]\(([^)]+)\)")
@@ -20,9 +21,19 @@ MATH_RE = re.compile(r"\\\((.+?)\\\)")
 
 def latex_inline_to_html(tex: str) -> str:
     s = tex.strip()
-    s = s.replace(r"\mathrm{sim}", "sim")
+    s = re.sub(r"\\mathrm\{([^}]+)\}", r"\1", s)
+    s = re.sub(r"\\overline\{([^}]+)\}", r"<span style='text-decoration:overline'>\1</span>", s)
+    s = s.replace(r"\min", "min")
     s = s.replace(r"\cos", "cos")
     s = s.replace(r"\alpha", "α")
+    s = s.replace(r"\sigma", "σ")
+    s = s.replace(r"\chi", "χ")
+    s = s.replace(r"\ge", "≥")
+    s = s.replace(r"\le", "≤")
+    s = s.replace(r"\to", "→")
+    s = s.replace(r"\cdot", "·")
+    s = s.replace(r"\approx", "≈")
+    s = s.replace(r"\_", "_")
     s = re.sub(r"([A-Za-z])_\{([^}]+)\}", r"\1<sub>\2</sub>", s)
     s = re.sub(r"([A-Za-z])_([A-Za-z0-9]+)", r"\1<sub>\2</sub>", s)
     s = s.replace("^*", "<sup>*</sup>")
@@ -61,13 +72,6 @@ body {
   padding: 32px 24px 64px;
   background: #fff;
   box-shadow: 0 0 0 1px #d0d7de;
-}
-.share-banner {
-  background: #fff8c5;
-  border: 1px solid #d4a72c;
-  padding: 10px 14px;
-  margin: 0 0 24px;
-  font-size: 14px;
 }
 h1 { font-size: 1.7rem; line-height: 1.3; margin-top: 0; }
 h2 { font-size: 1.35rem; border-bottom: 1px solid #d0d7de; padding-bottom: 6px; margin-top: 2rem; }
@@ -119,9 +123,31 @@ hr { border: 0; border-top: 1px solid #d0d7de; margin: 2rem 0; }
 """
 
 
+def first_heading(md_text: str) -> str:
+    for line in md_text.splitlines():
+        s = line.strip()
+        if s.startswith("# "):
+            return s[2:].strip()
+    return "report"
+
+
 def main() -> None:
-    raw = MD_PATH.read_text(encoding="utf-8")
-    raw = inline_images(raw, MD_PATH.parent)
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--md", default=str(DEFAULT_MD))
+    ap.add_argument("--html", default="")
+    ap.add_argument("--title", default="")
+    args = ap.parse_args()
+
+    md_path = Path(args.md)
+    if not md_path.is_absolute():
+        md_path = ROOT / md_path
+    html_path = Path(args.html) if args.html else md_path.with_suffix(".html")
+    if not html_path.is_absolute():
+        html_path = ROOT / html_path
+
+    raw = md_path.read_text(encoding="utf-8")
+    title = args.title or first_heading(raw)
+    raw = inline_images(raw, md_path.parent)
     raw = protect_math(raw)
     md = MarkdownIt("gfm-like", {"html": True, "linkify": False})
     body = md.render(raw)
@@ -130,20 +156,19 @@ def main() -> None:
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>多智能体语义收敛研究：Phase-1 前置研究报告</title>
+<title>{title}</title>
 <style>{CSS}</style>
 </head>
 <body>
 <div class="wrap">
-<div class="share-banner">发给别人请发<strong>本 HTML</strong>。图已嵌在文件里，用浏览器打开即可，不需要配图文件夹。旁边的 .md 是可改的源文件。</div>
 {body}
 </div>
 </body>
 </html>
 """
-    HTML_PATH.write_text(html, encoding="utf-8")
-    size_mb = HTML_PATH.stat().st_size / (1024 * 1024)
-    print(f"wrote {HTML_PATH} ({size_mb:.2f} MB)")
+    html_path.write_text(html, encoding="utf-8")
+    size_mb = html_path.stat().st_size / (1024 * 1024)
+    print(f"wrote {html_path} ({size_mb:.2f} MB)")
 
 
 if __name__ == "__main__":
