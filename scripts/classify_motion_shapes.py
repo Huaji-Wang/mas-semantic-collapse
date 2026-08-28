@@ -201,7 +201,7 @@ def draw_spaghetti(ax, rows: list[dict], max_t_show: int = 40) -> None:
         )
     ax.set_xlabel("window index t")
     ax.set_ylabel(r"$\cos(1,t)$")
-    ax.set_title("Motion shapes from existing curves (concat 200)")
+    ax.set_title("m-trajectory shapes from existing curves (concat 200)")
     ax.set_ylim(0.20, 1.05)
     ax.set_xlim(0, max_t_show)
     ax.legend(fontsize=8, loc="lower left")
@@ -248,7 +248,7 @@ def draw_crosstab(ax, rows: list[dict]) -> None:
     ax.set_xticklabels([MOTION_LABEL_ZH[m] for m in MOTION_ORDER], rotation=20, ha="right")
     ax.set_yticks(range(len(OLD_ORDER)))
     ax.set_yticklabels(OLD_ORDER)
-    ax.set_title("Old q80/q20  ×  motion shape")
+    ax.set_title("Old q80/q20  ×  m-trajectory shape")
     for i in range(mat.shape[0]):
         for j in range(mat.shape[1]):
             ax.text(j, i, str(mat[i, j]), ha="center", va="center", color="black")
@@ -356,7 +356,7 @@ def main() -> None:
 
     fig, axes = plt.subplots(2, 2, figsize=(10.5, 7.6))
     draw_examples(axes.ravel(), rows)
-    fig.suptitle("Example curve per motion class (concat 200)", y=0.98)
+    fig.suptitle("Example curve per m-trajectory class (concat 200)", y=0.98)
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     combo = out_dir / f"motion_shapes_{args.prefix}_examples.png"
     fig.savefig(combo, dpi=160)
@@ -379,7 +379,7 @@ def main() -> None:
     draw_examples([axes[1, 1]], rows)  # unused layout; replace with counts text
     axes[1, 1].clear()
     axes[1, 1].axis("off")
-    lines = ["concat 200 · 只用已有 sims_to_first", ""]
+    lines = ["concat 200 · 只用已有 sims_to_first", "只测 m 的径向位移；σ, d, k, χ 未计算", ""]
     for m in MOTION_ORDER:
         n = summary["motion_counts"].get(m, 0)
         stats = summary["by_motion"][m]
@@ -393,7 +393,7 @@ def main() -> None:
         "切法只适用于 concat 尺度，不要套到 mean-pool",
     ]
     axes[1, 1].text(0.02, 0.98, "\n".join(lines), va="top", ha="left", fontsize=11, family="sans-serif")
-    fig.suptitle("Semantic motion shapes (concat 200, bge-m3)", y=0.99)
+    fig.suptitle("m-trajectory shapes (concat 200, bge-m3) — σ, d, k, χ not computed", y=0.99)
     fig.tight_layout(rect=[0, 0, 1, 0.96])
     combo = out_dir / f"motion_shapes_{args.prefix}_2x2.png"
     fig.savefig(combo, dpi=160)

@@ -19,6 +19,10 @@ def load_config(path: str | Path | None = None) -> dict[str, Any]:
     with cfg_path.open("r", encoding="utf-8") as f:
         cfg = yaml.safe_load(f)
 
+    threads_env = os.getenv("THREADS_PATH", "").strip()
+    if threads_env:
+        cfg["data"]["threads_path"] = threads_env
+
     threads = Path(cfg["data"]["threads_path"])
     if not threads.is_absolute():
         threads = (cfg_path.parent.parent / threads).resolve()

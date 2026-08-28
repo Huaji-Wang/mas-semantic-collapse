@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>讨论云口径确认（供 Shiyang 审阅）</title>
+<style>
+:root { color-scheme: light; }
+body {
+  margin: 0;
+  font-family: "Segoe UI", "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+  line-height: 1.65;
+  color: #1f2328;
+  background: #f6f8fa;
+}
+.wrap {
+  max-width: 860px;
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+  background: #fff;
+  box-shadow: 0 0 0 1px #d0d7de;
+}
+h1 { font-size: 1.7rem; line-height: 1.3; margin-top: 0; }
+h2 { font-size: 1.35rem; border-bottom: 1px solid #d0d7de; padding-bottom: 6px; margin-top: 2rem; }
+h3 { font-size: 1.15rem; margin-top: 1.6rem; }
+h4 { font-size: 1.05rem; margin-top: 1.4rem; }
+p, li { font-size: 15.5px; }
+blockquote {
+  margin: 1rem 0;
+  padding: 0.2rem 1rem;
+  color: #424a53;
+  border-left: 4px solid #0969da;
+  background: #f6f8fa;
+}
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1rem 0;
+  font-size: 14.5px;
+}
+th, td {
+  border: 1px solid #d0d7de;
+  padding: 6px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+th { background: #f6f8fa; }
+img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 12px 0 4px;
+  border: 1px solid #d0d7de;
+}
+code, pre {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 13.5px;
+}
+code { background: #f6f8fa; padding: 0.1em 0.35em; border-radius: 4px; }
+pre {
+  background: #f6f8fa;
+  padding: 12px 14px;
+  overflow-x: auto;
+  border: 1px solid #d0d7de;
+  border-radius: 6px;
+}
+pre code { background: none; padding: 0; }
+.math { font-family: "Cambria Math", "Times New Roman", serif; }
+hr { border: 0; border-top: 1px solid #d0d7de; margin: 2rem 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>讨论云口径确认（供 Shiyang 审阅）</h1>
+<p><strong>日期</strong>：2026-08-26<br />
+<strong>样本</strong>：Reddit 合格线程前 200 条；评论级 <code>bge-m3</code><br />
+<strong>请审阅后表态</strong>：下列口径哪些可进入 1900 条全量与多智能体对照；哪些必须改。在改口之前，全量嵌入暂停。</p>
+<hr />
+<h2>1. 五个坐标怎么算</h2>
+<table>
+<thead>
+<tr>
+<th>量</th>
+<th>操作定义</th>
+<th>需要确认的选择</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><span class="math">m</span></td>
+<td>非重叠 10 条评论的归一化均值；报告 <span class="math">cos(m<sub>1</sub>,m<sub>t</sub>)</span> 与 <span class="math">cos(m<sub>t-1</sub>,m<sub>t</sub>)</span></td>
+<td>时间网格与现有 <span class="math">S<sub>end</sub></span> 对齐</td>
+</tr>
+<tr>
+<td><span class="math">σ,d,k</span></td>
+<td>宽度 30、步长 10 的支撑窗，与 <span class="math">m</span> 的块对齐</td>
+<td><strong>时间网格与估计支撑拆开</strong>。10 点不足以估 <span class="math">d,k</span></td>
+</tr>
+<tr>
+<td><span class="math">k</span></td>
+<td>整数特征间隙几乎恒为 1（99.2% 窗）；主信号改为 Fiedler 二分的余弦 silhouette</td>
+<td><strong>Fission 用连续代理，不用整数 <span class="math">k</span></strong></td>
+</tr>
+<tr>
+<td><span class="math">χ</span></td>
+<td>身份无关：去中心点云的匈牙利匹配代价。不用作者 id</td>
+<td>相邻窗作者中位重叠仅 12.5%，37.7% 完全不重叠</td>
+</tr>
+</tbody>
+</table>
+<p>评论向量不落盘。嵌入成本与 mean-pool 标注相同。</p>
+<hr />
+<h2>2. <span class="math">χ</span> 在运动表里的角色</h2>
+<p>身份无关 <span class="math">χ</span> 在本批几乎处处偏高（中位 <span class="math">\approx 0.83</span>）。若按原表要求 Translation 必须 <span class="math">χ</span> 稳定，则本语料上几乎贴不出 Translation。</p>
+<p><strong>现行选择</strong>：把偏高的 <span class="math">χ</span> 当作 Reddit 评论窗更替的背景。Translation <strong>不</strong>以 <span class="math">χ</span> 稳定为否决项。Crystallization 只在「<span class="math">χ</span> 处于样本下 20% <strong>且</strong> <span class="math">σ,d</span>、二分强度稳定」时标记；该阈仍约 0.80，是相对低，不是 <span class="math">χ→ 0</span>。</p>
+<hr />
+<h2>3. 运动标签贴在哪一层</h2>
+<p>标签贴在相邻步 <span class="math">t-1→ t</span>，不是整帖互斥一类。Orbit / Vortex / Breathing / Cascade 在本尺度标为<strong>不可判定</strong>。</p>
+<p>可判别子集的互斥优先级：</p>
+<p>结晶 <span class="math">→</span> 凝聚 <span class="math">→</span> 裂变代理 <span class="math">→</span> 成丝 <span class="math">→</span> 扩散 <span class="math">→</span> 平移 <span class="math">→</span> 换位背景</p>
+<p><span class="math">n=2814</span> 步的第一版占比：换位背景 36.4%；凝聚 20.0%；扩散 15.4%；裂变代理 14.9%；平移 6.9%；结晶 5.4%；成丝 1.0%。凝聚/扩散接近所取分位尾部，<strong>不能</strong>直接读成过程频率。较站得住的三句是：主形态为换位背景；纯平移少见；成丝基本测不到。</p>
+<hr />
+<h2>4. 请表态的三件事</h2>
+<ol>
+<li><strong>身份无关 <span class="math">χ</span> + 当作 Reddit 背景</strong>，是否可接受？若否，作者级 <span class="math">χ</span> 将丢掉约四成相邻窗。</li>
+<li><strong>窗宽 10 / 支撑 30 拆开</strong>，以及 <strong>Fission 用二分强度</strong>，是否可接受？</li>
+<li><strong>步级互斥 + 四种运动本尺度不可判定</strong>，是否可接受？若要求整帖一类或必须凑满十种，规则要重写。</li>
+</ol>
+<p>详细读数：<code>docs/order_params_pilot200.html</code>（五个量）、<code>docs/step_motions_pilot200.html</code>（相邻步标签）、<code>docs/motion_shapes_concat200.html</code>（仅 <span class="math">m</span> 的四种形状，另一套窗口构造）。</p>
+<p>三项均确认之前，不启动 1900 条全量嵌入，也不把该标签接到多智能体对照。</p>
+
+</div>
+</body>
+</html>
