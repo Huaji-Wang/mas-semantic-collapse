@@ -1,39 +1,48 @@
 # mas-semantic-collapse
 
-衡量一场讨论在语义空间里如何演化：人类 Reddit 评论区是对照，多智能体互相接话是实验对象。本仓库提供嵌入、打分、讨论云五个序参量，以及（可选的）AutoGen 模拟评论区。
+多人（或多个模型）接着聊时，意思会不会越来越窄、越来越像开场那几句？本项目把一场评论区讨论写成语义空间里的一团点，跟踪这团点怎么动；人类 Reddit 帖是对照，多智能体互相接话是实验对象。
 
-测量族参考 Kong et al., [*Multi-LLM Systems Exhibit Robust Semantic Collapse*](https://arxiv.org/abs/2605.17193)。本文不沿用该文的人类二分类标签；人类侧在本语料内按 \(S_{end}\) 的 q80/q20 相对切开，并用 \((m,\sigma,d,k,\chi)\) 描述讨论云，而不是只用一个终点分数。
+只看「聊到最后还像不像开头」会把不同过程标成同一类。有的帖几乎没离开开场，有的绕一圈又回来，两者期末都可以很像开头；有的搬走后停住，有的还在往下掉，两者期末都可以不像开头。要区分这些过程，需要五个互相不蕴含的量。
 
-私有仓库。需要别人跑数时，在 GitHub **Settings → Collaborators** 添加协作者。原始 Reddit dump 与 `outputs/*.jsonl` **不在 git 里**。
+测量方式参考 Kong et al., [*Multi-LLM Systems Exhibit Robust Semantic Collapse*](https://arxiv.org/abs/2605.17193)。本仓库不照搬该文的人类标签，而在本语料上估计下面五个量，并（可选地）跑 AutoGen 模拟评论区。
 
----
-
-## 这是什么
-
-一条讨论被看成语义空间中的一团点（每条评论一个 embedding）。短时窗上的点构成讨论云。云的状态用五个序参量描述：
-
-| 符号 | 含义 | 本仓库中的估计 |
-| --- | --- | --- |
-| \(m\) | 云心：这批发言的平均语义位置 | 非重叠 10 条评论的归一化均值 |
-| \(\sigma\) | 散布 | 点到云心的平均余弦距离 |
-| \(d\) | 有效维数 | 余弦核特征值的参与比 |
-| \(k\) | 模态（几坨） | 整数特征间隙几乎恒为 1；可操作信号是二分强度 |
-| \(\chi\) | 换位 | 身份无关：去中心后两点云的匹配代价 |
-
-\(S_{end}\) 只是 \(m(t)\) 相对第一窗的径向终点。它不能单独回答云是否散开、降维、裂成阵营，或内部构型是否更换。十条运动（Translation、Condensation、Orbit 等）是这些坐标的**相邻步差分签名**，不是十种整帖类别。
-
-当前阶段（Phase-1）做两件事的准备：（1）在人类帖上把上述量算出来；（2）搭好多智能体评论区基线，便于之后用**同一套估计**对照，而不是只比两个 \(S_{end}\)。
+私有仓库。让别人跑数：GitHub **Settings → Collaborators**。原始数据和 `outputs/*.jsonl` 不在 git 里。
 
 ---
 
-## 作用是什么
+## 五个量分别是什么、有什么意义
 
-- **人类侧打分**：评论级 `bge-m3` 嵌入（接口预留 `text-embedding-3-large`），得到 \(S_{end}\) 等曲线，并可按 q80/q20 打相对标签。
-- **讨论云**：同一批评论向量上估计五个序参量；可再做相邻步运动标签（启发式，口径待确认）。
-- **多智能体基线**：AutoGen + DeepSeek，flat / weak_tree，用同一套指标给模拟评论区打分。
-- **给算力机器跑**：分块 `--skip` / `--limit` / `--device cuda`，合并 jsonl 后在本地作图。
+把每条评论做成 embedding 里的一个点。相邻一段时间里的点构成**讨论云**。五个量描述这团云**此刻**长什么样；它们随时间的变化，才对应老师表里的运动名称（平移、凝聚、裂变等）。
 
-口径尚未全部锁定（窗宽与支撑拆开、身份无关 \(\chi\)、步级互斥标签）。全量约 1900 条嵌入建议在 [`docs/protocol_for_shiyang.md`](docs/protocol_for_shiyang.md) 确认后再开。小样本 `--limit` 随时可用来验证环境。
+**\(m\)（位置 / 云心）**  
+这批发言的平均语义位置，也就是「这会儿大家总体在说什么」。\(m\) 搬走，表示话题中心从开场挪到了别处（例如从「该不该买」转到「买哪个型号」）。常用的 \(S_{end}\) 只是末期 \(m\) 相对第一窗 \(m\) 还有多像，是这一根轴的终点，不是整场讨论的全部。\(m\) 搬走本身**不等于**讨论死掉：整团可以换地方，内部仍可以很丰富。
+
+**\(\sigma\)（散布）**  
+点离云心有多远，也就是「这会儿大家说得有多散」。\(\sigma\) 变大：各说各话、例子越甩越开（扩散）。\(\sigma\) 变小：说法收成同一句口号（凝聚）。只看 \(m\) 看不见这件事：中心可以停在原地，云自己胀大或收紧。
+
+**\(d\)（有效维数）**  
+这团点占了几个独立方向，而不是离中心有多远。\(d\) 高：好几件不相关的意思同时在场。\(d\) 下降：被压成一条线，例如只剩赞成–反对（成丝）。\(\sigma\) 大只说明离中心远；\(d\) 回答的是「远在一个方向上，还是摊在许多方向上」。
+
+**\(k\)（模态 / 有几坨）**  
+点是连续的一团，还是中间空着、裂成几派。\(k=1\)：意见是过渡的。\(k\) 上升：出现分开的阵营（裂变）。这和 \(\sigma\)、\(d\) 都不同：两派可以离中心都很远（\(\sigma\) 大），也可以主要只占两个方向（\(d\) 不必很大）。短评论窗上整数 \(k\) 几乎总是 1，本仓库因此加报「硬切成两坨干不干净」（二分强度），用来看裂变有没有信号。
+
+**\(\chi\)（换位）**  
+云的外形可以不变，但谁占哪个位子可以在换。\(\chi\) 高：相邻两段里，点对不上号（成员或说法在换位）。\(\chi\) 降到接近 0：位子冻住，像各复读各的（结晶）。中心可以几乎不动（相邻两窗的 \(m\) 很像），内部仍可以对不上——那就是「中心慢、换位快」。本语料里作者很少跨窗重复出现，所以 \(\chi\) 不跟用户 id，而用去掉云心之后两点云的匹配代价。
+
+这五个量不能互相替代。\(S_{end}\) 高，可能是锚在开场，也可能是绕一圈回来（轨道）。\(\sigma\) 上升，可能是均匀扩散，也可能是裂成两派，只有 \(k\) 能分开。相邻 \(m\) 很像，只说明质心没怎么挪，不说明 \(\chi\) 低。人机对照若只用 \(S_{end}\) 切两类，等于把上述混合物当成同一种处理条件。
+
+本仓库现阶段：（1）在人类帖上把五个量算出来；（2）搭好多智能体评论区，以后用**同一套量**对照，而不是只比两个终点分数。
+
+---
+
+## 这个仓库能做什么
+
+- 把 Reddit 线程按窗嵌入，得到 \(S_{end}\) 等曲线，并按样本内 q80/q20 做相对标签。
+- 在同一批评论向量上估计 \((m,\sigma,d,k,\chi)\)，再按相邻步差分贴运动名（第一版启发式，口径待确认）。
+- 用 AutoGen + DeepSeek 生成模拟评论区，并用同一套指标打分。
+- 在 GPU 上分块跑嵌入（`--skip` / `--limit` / `--device cuda`），合并后在本地作图。
+
+全量约 1900 条建议在 [`docs/protocol_for_shiyang.md`](docs/protocol_for_shiyang.md) 确认后再跑。验证环境随时可以用 `--limit`。
 
 ---
 
@@ -123,7 +132,15 @@ python -m scripts.score_sims --config configs/default.yaml
 
 ## English
 
-Research code for **semantic evolution of comment-section discussions**: Reddit threads as the human reference, multi-agent LLM threads as the experimental condition. Phase-1 (i) scores human threads with windowed embeddings and five discussion-cloud order parameters \((m,\sigma,d,k,\chi)\), and (ii) runs an AutoGen DeepSeek baseline. \(S_{end}\) is only the radial endpoint of \(m\); it is not a path and not internal geometry.
+A comment thread is a **cloud of embedding points**. Five coordinates describe the cloud at a time; \(S_{end}\) is only how close the late center \(m\) remains to the first window.
+
+- \(m\): where the mean meaning sits. Moving \(m\) is a topic shift, not by itself “collapse”.
+- \(\sigma\): how far comments sit from that mean (spread vs slogan-like condensation).
+- \(d\): how many independent directions the cloud occupies (a blob vs a single agree–disagree line).
+- \(k\): one lump vs separated camps. Integer \(k\) saturates at 1 on short windows; we also report a continuous split score.
+- \(\chi\): whether the internal arrangement turns over after the center is removed. The center can stay put while \(\chi\) stays high.
+
+Human Reddit is the reference; multi-agent reply threads are the experimental condition. Same estimator on both sides, not two \(S_{end}\) numbers alone.
 
 Private repo: add collaborators on GitHub. Data dumps and `outputs/*.jsonl` are not in git. Set `THREADS_PATH` if the zstd dump is not at `../threads_2026-01_to_2026-05.jsonl.zst`. GPU chunk recipe: [`docs/RUN_ON_GPU.md`](docs/RUN_ON_GPU.md).
 
