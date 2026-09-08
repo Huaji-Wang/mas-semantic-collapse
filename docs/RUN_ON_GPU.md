@@ -1,5 +1,7 @@
 # 在算力机器上跑数据
 
+**这台带屏幕的 RTX 4070 笔记本禁止 CUDA。** 2026-09-04 用 `--device cuda` 跑嵌入约 15 分钟后整机断电关机，检查点也写坏了。本机只用 `--device cpu`。CUDA 只留给不带显示的独立算力盒，并且必须加 `--allow-laptop-cuda`。
+
 仓库不含 Reddit 原始数据、不含 `outputs/` 下的 jsonl。嵌入模型首次运行时会从 Hugging Face 下载 `BAAI/bge-m3`。
 
 当前口径（窗宽 10 / 支撑 30、身份无关 \(\chi\)、二分强度代理 \(k\)）仍待确认。确认前若只跑通流水线，可用 `--limit` 做小样本；全量约 1900 条请在口径确认后启动。
@@ -45,16 +47,22 @@ export THREADS_PATH=/absolute/path/threads_2026-01_to_2026-05.jsonl.zst
 python scripts/extract_order_params.py --backend hashing --limit 15 --tag smoke
 ```
 
-GPU 分块（可中断；`--skip` 按合格线程计数，不是按文件行号）：
+本机 CPU（默认可中断；每条帖立刻落盘，断电只丢当前这一条）：
 
 ```bash
-python scripts/extract_order_params.py --skip 0    --limit 500 --device cuda --batch-size 32 --tag gpu_000_500
-python scripts/extract_order_params.py --skip 500  --limit 500 --device cuda --batch-size 32 --tag gpu_500_1000
-python scripts/extract_order_params.py --skip 1000 --limit 500 --device cuda --batch-size 32 --tag gpu_1000_1500
-python scripts/extract_order_params.py --skip 1500 --limit 0   --device cuda --batch-size 32 --tag gpu_1500_end
+python scripts/extract_order_params.py --limit 200 --device cpu --tag chik200
 ```
 
-`--limit 0` 表示 skip 之后全部跑完。若某块中断，同 `--tag` 会覆盖该块；换新 tag 或从该块的 skip 重跑。检查点为 `*.partial.jsonl`，正常结束会写成正式 jsonl 并删除 partial。
+独立算力盒上的 GPU 分块（可中断；`--skip` 按合格线程计数，不是按文件行号）。**必须**加 `--allow-laptop-cuda`：
+
+```bash
+python scripts/extract_order_params.py --skip 0    --limit 500 --device cuda --allow-laptop-cuda --batch-size 32 --tag gpu_000_500
+python scripts/extract_order_params.py --skip 500  --limit 500 --device cuda --allow-laptop-cuda --batch-size 32 --tag gpu_500_1000
+python scripts/extract_order_params.py --skip 1000 --limit 500 --device cuda --allow-laptop-cuda --batch-size 32 --tag gpu_1000_1500
+python scripts/extract_order_params.py --skip 1500 --limit 0   --device cuda --allow-laptop-cuda --batch-size 32 --tag gpu_1500_end
+```
+
+`--limit 0` 表示 skip 之后全部跑完。检查点为 `*.partial.jsonl`（每完成一条就追加并 fsync）。正常结束写成正式 jsonl 并删除 partial。
 
 合并：
 

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>标题簇 × 运动类 · chik200</title>
+<style>
+body { font-family: "Segoe UI","PingFang SC","Microsoft YaHei",sans-serif; margin: 0; background:#f6f8fa; color:#1f2328; }
+.wrap { max-width: 1080px; margin: 0 auto; padding: 32px 24px 64px; background:#fff; box-shadow: 0 0 0 1px #d0d7de; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; margin: 1rem 0; }
+th, td { border: 1px solid #d0d7de; padding: 5px 8px; }
+th { background: #f6f8fa; }
+code { background:#f6f8fa; padding: 0.1em 0.35em; }
+h1 { margin-top: 0; }
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1>标题簇 × 九类运动 · chik200</h1>
+<p>第 3 级。只嵌了标题（bge_m3:BAAI/bge-m3），再对上第 2 级已经打好的运动标签。
+标题向量没有写进评论云。</p>
+<p><strong>切法：</strong>kmeans，最小簇 15。轮廓系数最高 0.039，最大簇 54 / 198。簇大小：[42, 36, 47, 19, 54]。</p>
+<p>轮廓系数选 k：[{'k_init': 5, 'n_clusters': 5, 'sizes': [42, 36, 47, 19, 54], 'min_size': 19, 'silhouette': 0.039}, {'k_init': 6, 'n_clusters': 5, 'sizes': [39, 51, 49, 18, 41], 'min_size': 18, 'silhouette': 0.0346}, {'k_init': 7, 'n_clusters': 7, 'sizes': [32, 28, 24, 39, 32, 27, 16], 'min_size': 16, 'silhouette': 0.0257}, {'k_init': 8, 'n_clusters': 6, 'sizes': [50, 18, 39, 15, 53, 23], 'min_size': 15, 'silhouette': 0.0291}, {'k_init': 9, 'n_clusters': 7, 'sizes': [21, 64, 22, 15, 31, 23, 22], 'min_size': 15, 'silhouette': 0.0363}, {'k_init': 10, 'n_clusters': 7, 'sizes': [28, 16, 34, 26, 37, 20, 37], 'min_size': 16, 'silhouette': 0.0145}, {'k_init': 11, 'n_clusters': 5, 'sizes': [37, 24, 22, 70, 45], 'min_size': 22, 'silhouette': 0.029}, {'k_init': 12, 'n_clusters': 6, 'sizes': [40, 21, 32, 40, 31, 34], 'min_size': 21, 'silhouette': 0.017}]。不可用标题不进表。</p>
+<p>独立性（脚注）：χ²=19.9139　p=0.463326　Cramér's V=0.1586。</p>
+<table>
+<thead><tr><th>簇 \ 运动</th><th>平移</th><th>扩散</th><th>凝聚</th><th>裂变</th><th>结晶</th><th>涡流</th><th>轨道</th><th>呼吸</th><th>级联</th></tr></thead>
+<tbody>
+<tr><th>全体可用帖的占比（基线）</th><td>82.3%</td><td>4.0%</td><td>2.5%</td><td>7.1%</td><td>0.0%</td><td>0.0%</td><td>3.5%</td><td>0.0%</td><td>0.5%</td></tr>
+<tr><th>Personal Preferences &amp; Habits <code>1</code> n=42</th><td>33</td><td>3</td><td>1</td><td>4</td><td>0</td><td>0</td><td>1</td><td>0</td><td>0</td></tr><tr><th>AITA Relationship Boundaries <code>2</code> n=36</th><td>29</td><td>3</td><td>0</td><td>1</td><td>0</td><td>0</td><td>2</td><td>0</td><td>1</td></tr><tr><th>Relationship Advice <code>3</code> n=47</th><td>38</td><td>1</td><td>1</td><td>5</td><td>0</td><td>0</td><td>2</td><td>0</td><td>0</td></tr><tr><th>Human Flaws and Logic <code>4</code> n=19</th><td>17</td><td>0</td><td>2</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td><td>0</td></tr><tr><th>Men, Dating, and Insecurities <code>5</code> n=54</th><td>46</td><td>1</td><td>1</td><td>4</td><td>0</td><td>0</td><td>2</td><td>0</td><td>0</td></tr>
+</tbody>
+</table>
+<h2>相对基线明显偏离的格子</h2>
+<p>没有格子同时满足 BH q&lt;0.05 和 |残差|≥1.5。多数簇仍以平移为主，这是基线。</p>
+<h2>每簇在问什么</h2>
+<h3>簇 1　Personal Preferences &amp; Habits</h3><p>Asks about individual choices, experiences, or routines related to spending, needs, sleep, food, or morning drinks. <span style='color:#656d76'>n=42　deepseek:deepseek-chat</span></p><p>突出词：country, did, breakfast, costs, drink, best, whats, eating</p><ol><li>What is the the best money you've ever spent?</li><li>What is something that you thought you didn’t need but actually needed it?</li><li>What’s the longest you’ve ever went without sleeping?</li><li>Koji vam je omiljeni čudni food combo?</li><li>What’s your country’s go to morning drink?</li><li>What's for breakfast?</li><li>What’s the farthest you’d be willing to go without a car, uber, plane, boat, taxi or any sort of public transport or heavy duty vehicle?</li><li>Why are you not naked right now?</li></ol><h3>簇 2　AITA Relationship Boundaries</h3><p>Posts asking for judgment on interpersonal conflicts involving family, friends, or exes. <span style='color:#656d76'>n=36　deepseek:deepseek-chat</span></p><p>突出词：aita, aitah, support, friend, aitah calling, calling, understand, iran</p><ol><li>AITA for asking my children’s paternal grandparents to tone down the gifts and experiences they give them?</li><li>AITAH for calling my dad useless</li><li>AITA for accidentally telling my ex-bf’s mum that he’s married?</li><li>AITA for refusing to share credit (and money) after my friend added herself to my project without asking?</li><li>AITAH for calling my friend delusional for saying I should be grateful to have a mom?</li><li>Létezik olyan, hogy valaki rossz ajándékozó vagy ez csak egy kifogás?</li><li>AITA for missing my MIL wedding?</li><li>I hate my immigrant parents for bringing me to America</li></ol><h3>簇 3　Relationship Advice</h3><p>Users seeking guidance on personal relationships, attraction, and life decisions. <span style='color:#656d76'>n=47　deepseek:deepseek-chat</span></p><p>突出词：guys, bathtubs, mascara, grindr, need advice, question, advice, se</p><ol><li>Need Advice</li><li>Guys can you please fill this</li><li>Just came back from the US</li><li>I think I'm into younger men</li><li>My husband resents me, I am considering to leave</li><li>Americans, how are you feeling after this weekend?</li><li>Are you parents still married?</li><li>Jeste li primijetili..</li></ol><h3>簇 4　Human Flaws and Logic</h3><p>Questions exploring contradictions between logical ideals and human behavior or limitations. <span style='color:#656d76'>n=19　deepseek:deepseek-chat</span></p><p>突出词：humans, useless superpower, superpower, doing, aren, logically, useless, hates</p><ol><li>What is a system that works perfectly until humans are involved?</li><li>Logically speaking why shouldn’t we kill ourselves?</li><li>How do people survive severe weather when they live in abandoned houses, factories, etcetera? Are there like safe ways to start a fire for heat and such?</li><li>CMV: Most people aren’t just selfish… they are actively willing to harm others</li><li>Why aren't cameras still doing what phones are doing?</li><li>How close have you ever been to death? Near death experiences or just getting lucky in a potentially dangerous situation?</li><li>Everyone hates ads, everyone hates the idea of paying a subscription, and everyone hates companies selling their data. How do people logically expect a website to exist if they're not doing at least one of these?</li><li>ELI5 - Why is trench foot so damaging?</li></ol><h3>簇 5　Men, Dating, and Insecurities</h3><p>Questions and discussions about male perspectives, dating dynamics, and relationship insecurities from women's viewpoints. <span style='color:#656d76'>n=54　deepseek:deepseek-chat</span></p><p>突出词：men, sex, life, women, like, dating, feel, guy</p><ol><li>Need advice of a guy I've been on a few dates with. From a male perspective, what do you think about this guy?</li><li>What is a common issue men face you wish more women understood?</li><li>Body insecurity in a relationship with an attractive man?</li><li>How do I get over this embarrassing moment with my boyfriend?</li><li>Why do I never get approached by men?</li><li>Do you like being single?</li><li>Men, what is the best way to go about attracting you?</li><li>How would you feel if you found out that someone who you've recently started dating was deeply depressed?</li></ol>
+<p style="color:#656d76">契约见 docs/pipeline.md。重新生成：python scripts/run_pipeline.py --from 3 --tag chik200</p>
+</div>
+</body>
+</html>

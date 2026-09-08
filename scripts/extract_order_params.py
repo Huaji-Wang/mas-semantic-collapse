@@ -11,14 +11,19 @@ Fast code smoke (hashing backend, not for reported numbers):
 Pilot on CPU:
     python scripts/extract_order_params.py --limit 200 --tag pilot200
 
-Resume the next chunk on a GPU machine:
-    python scripts/extract_order_params.py --skip 200 --limit 400 --device cuda --batch-size 32 --tag gpu200_600
+Resume after a crash (CPU only on the display laptop):
+    python scripts/extract_order_params.py --skip N --limit 200 --device cpu --tag chik200
+
+Do not use --device cuda on the RTX 4070 laptop that also drives the screen:
+it has hard-powered-off after ~15 minutes. CUDA only on a separate compute box,
+and only with --allow-laptop-cuda if you insist.
 """
 
 from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 from pathlib import Path
@@ -46,7 +51,13 @@ def main() -> None:
     ap.add_argument("--backend", default=None, help="override embedding.backend (bge_m3|hashing|openai)")
     ap.add_argument("--window-size", type=int, default=None, help="m grid, default from config")
     ap.add_argument("--support-size", type=int, default=30, help="points supporting sigma/d/k")
-    ap.add_argument("--checkpoint-every", type=int, default=10)
+    ap.add_argument("--cluster-distance", type=float, default=0.55, help="cosine-distance cutoff for k")
+    ap.add_argument("--checkpoint-every", type=int, default=1, help="fsync every N finished threads")
+    ap.add_argument(
+        "--allow-laptop-cuda",
+        action="store_true",
+        help="required together with --device cuda; this display GPU has shut the machine down",
+    )
     args = ap.parse_args()
 
     cfg = load_config(args.config)
@@ -59,10 +70,18 @@ def main() -> None:
     window_size = args.window_size or int(cfg["windowing"]["window_size"])
     support_size = max(window_size, int(args.support_size))
 
+    if str(cfg["embedding"].get("device", "cpu")).lower() == "cuda" and not args.allow_laptop_cuda:
+        raise SystemExit(
+            "Refusing --device cuda on this machine. The RTX 4070 also drives the "
+            "display and has hard-powered-off after ~15 minutes of embedding. "
+            "Run with --device cpu, or pass --allow-laptop-cuda only on a "
+            "separate compute GPU that does not drive the screen."
+        )
+
     print(
         f"backend={cfg['embedding'].get('backend')} device={cfg['embedding'].get('device')} "
         f"batch_size={cfg['embedding'].get('batch_size')} window={window_size} support={support_size} "
-        f"skip={args.skip} limit={args.limit or 'all'}",
+        f"skip={args.skip} limit={args.limit or 'all'} cluster_distance={args.cluster_distance}",
         flush=True,
     )
 
@@ -76,10 +95,20 @@ def main() -> None:
     partial_path = out_dir / f"{stem}.partial.jsonl"
     summary_path = out_dir / f"{stem}_summary.json"
 
-    def flush(path: Path, records: list[dict]) -> None:
-        with path.open("w", encoding="utf-8") as f:
+    def append_row(path: Path, record: dict) -> None:
+        with path.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            f.flush()
+            os.fsync(f.fileno())
+
+    def rewrite(path: Path, records: list[dict]) -> None:
+        tmp = path.with_suffix(path.suffix + ".tmp")
+        with tmp.open("w", encoding="utf-8") as f:
             for r in records:
                 f.write(json.dumps(r, ensure_ascii=False) + "\n")
+            f.flush()
+            os.fsync(f.fileno())
+        tmp.replace(path)
 
     rows: list[dict] = []
     skipped = 0
@@ -102,6 +131,7 @@ def main() -> None:
             embs,
             window_size=window_size,
             support_size=support_size,
+            cluster_distance=float(args.cluster_distance),
         )
         row = {
             "post_id": th.post_id,
@@ -113,6 +143,7 @@ def main() -> None:
             **summarize_order_params(traj, late_windows=int(cfg["windowing"]["late_windows"])),
         }
         rows.append(row)
+        append_row(partial_path, row)
         pbar.update(1)
 
         if len(rows) % args.checkpoint_every == 0:
@@ -124,13 +155,12 @@ def main() -> None:
                 f"per_thread={per:.1f}s eta={remaining / 60:.1f}min",
                 flush=True,
             )
-            flush(partial_path, rows)
 
         if args.limit and len(rows) >= args.limit:
             break
     pbar.close()
 
-    flush(detail_path, rows)
+    rewrite(detail_path, rows)
     elapsed = time.perf_counter() - t0
     summary = {
         "n_threads": len(rows),
@@ -141,13 +171,14 @@ def main() -> None:
         "device": cfg["embedding"].get("device"),
         "batch_size": cfg["embedding"].get("batch_size"),
         "window_size": window_size,
-        "support_size": support_size,
+        "cluster_distance": float(args.cluster_distance),
         "min_comments": cfg["data"]["min_comments"],
         "max_comments": cfg["data"].get("max_comments"),
         "elapsed_sec": round(elapsed, 1),
         "note": (
             "m on non-overlapping windows; sigma/d/k on centred support windows; "
-            "chi is identity-free (adjacent centroid step + centred matching cost). "
+            "official chi is angular occupancy vs the first window (time vs chi; "
+            "wave = loop in high-D). churn_config is the old 1024-D Hungarian cost. "
             "Comment vectors are not persisted."
         ),
     }

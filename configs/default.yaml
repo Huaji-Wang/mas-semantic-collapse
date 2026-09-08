@@ -27,10 +27,18 @@ embedding:
   backend: bge_m3
   model_name: BAAI/bge-m3
   openai_model: text-embedding-3-large
-  # This laptop's RTX 4070 8GB (also drives the display) reboots under CUDA labeling.
-  # Stay on CPU until another machine is available. Override with --device if needed.
+  # This display RTX 4070 hard-powered-off after ~15 min of CUDA embedding (2026-09-04).
+  # Keep device: cpu. scripts/extract_order_params.py refuses cuda unless --allow-laptop-cuda.
   batch_size: 32
   device: cpu
+
+# Stage 3 (titles only). Swap backend here without re-embedding comments.
+# Same keys as embedding. Unset fields fall back to embedding: above.
+title_embedding:
+  backend: bge_m3
+  model_name: BAAI/bge-m3
+  device: cpu
+  batch_size: 32
 
 metrics:
   compute:
