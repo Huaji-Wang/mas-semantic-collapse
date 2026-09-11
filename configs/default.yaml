@@ -9,6 +9,12 @@ data:
   min_comments: 50
   max_comments: 1000  # drop mega-threads before labeling
   linearize: toplevel_then_time
+  # Conditioned dump: same {post, comments} shape plus participants/coverage.
+  # participants[author].h is a history *count*, not text; cond == (h >= 10).
+  # Relative paths resolve against the repo parent. Point elsewhere with
+  # CONDITIONED_THREADS_PATH / AUTHOR_THREADS_CSV in .env.
+  conditioned_threads_path: ../conditioned_threads_2026/conditioned_threads.jsonl.zst
+  author_threads_csv: ../conditioned_threads_2026/user_history/author_threads.csv
 
 windowing:
   window_size: 10
@@ -69,7 +75,28 @@ simulation:
   n_per_class: 50
   n_runs: 1
 
+# Persona demo: replay one real cast on the same post with LLM stand-ins.
+# Human line and sim line both keep cast comments only, same positions, same count.
+persona_demo:
+  tag: persona_demo
+  posts:
+    - 1sql6fs   # r/asklinguistics,   107 comments, cast writes 66%
+    - 1rd4ske   # r/AskALiberal,       88 comments, cast writes 60%
+    - 1sp4y8z   # r/AskConservatives,  79 comments, cast writes 51%
+  cast_size: 5
+  min_in_thread: 3        # cast must speak at least this often in the demo thread
+  min_cross_threads: 2    # and appear in at least this many sampled threads
+  history_max_samples: 15 # cross-thread comments fed to the card writer
+  history_max_chars: 6000
+  card_samples: 3         # verbatim snippets pinned into the agent's system prompt
+  sample_max_chars: 700
+  card_temperature: 0.3
+  chars_per_token: 3.6    # p90 chars -> max_tokens
+  max_tokens_floor: 80
+  max_tokens_ceil: 900
+
 paths:
   outputs: outputs
   labels: outputs/labels
   sims: outputs/sims
+  personas: outputs/personas

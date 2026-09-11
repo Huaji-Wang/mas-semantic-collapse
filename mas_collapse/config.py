@@ -28,7 +28,22 @@ def load_config(path: str | Path | None = None) -> dict[str, Any]:
         threads = (cfg_path.parent.parent / threads).resolve()
     cfg["data"]["threads_path"] = str(threads)
 
-    for key in ("outputs", "labels", "sims"):
+    for key, env_var in (
+        ("conditioned_threads_path", "CONDITIONED_THREADS_PATH"),
+        ("author_threads_csv", "AUTHOR_THREADS_CSV"),
+    ):
+        override = os.getenv(env_var, "").strip()
+        raw = override or cfg["data"].get(key)
+        if not raw:
+            continue
+        p = Path(raw)
+        if not p.is_absolute():
+            p = (cfg_path.parent.parent / p).resolve()
+        cfg["data"][key] = str(p)
+
+    for key in ("outputs", "labels", "sims", "personas"):
+        if key not in cfg["paths"]:
+            continue
         p = Path(cfg["paths"][key])
         if not p.is_absolute():
             p = (ROOT / p).resolve()

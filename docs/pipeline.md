@@ -84,3 +84,48 @@ chik200 已经跑完，本轮不要再跑这一级。
 | `1` | 三级全跑。会重新嵌全部评论，本机 CPU 要数小时。 |
 
 入口：`scripts/run_pipeline.py`。
+
+---
+
+# 旁支：人设 LLM 模拟 demo
+
+和上面三级平行，不共用 tag。做的是**同一个帖、同一批人、同样的发言位置**，把真人换成按其历史写成的 LLM 角色，再用同一套五个序参量量两条线。
+
+数据来自另一份 dump（`conditioned_threads.jsonl.zst`，5000 帖、104 个版块各 48 帖、2026-01 到 05）。它的结构和主 dump 一样是 `{post, comments}`，额外多了 `participants`。注意 `participants[author].h` 是历史**条数**不是正文，`cond` 就是 `h >= 10`。人设的正文只能来自该账号在**其它采样帖**里的真实评论。
+
+两个路径用环境变量给：
+
+```bash
+CONDITIONED_THREADS_PATH=.../conditioned_threads_2026/conditioned_threads.jsonl.zst
+AUTHOR_THREADS_CSV=.../conditioned_threads_2026/user_history/author_threads.csv
+```
+
+四步，每步只认上一步的文件：
+
+| 步 | 脚本 | 输入 | 输出 |
+|---|---|---|---|
+| A | `scripts/build_persona_demo.py` | 上面两个路径 | `outputs/personas/persona_demo/cast_and_history.json`、`cards.json` |
+| B | `scripts/run_persona_demo.py` | A | `outputs/sims/persona_demo/{post_id}.json` |
+| C | `scripts/score_persona_demo.py` | B | `outputs/order_params/order_params_persona_demo.jsonl`、`outputs/labels/thread_motions_persona_demo.jsonl` |
+| D | `scripts/export_persona_demo_html.py` | B、C | `docs/persona_demo.html` |
+
+```bash
+python scripts/build_persona_demo.py                 # 扫两遍 dump，约 40 秒；卡有缓存
+python scripts/run_persona_demo.py --limit 4         # 先小跑看看
+python scripts/run_persona_demo.py                   # 全量 164 条，约 2 分钟，可断点续跑
+python scripts/score_persona_demo.py                 # CPU 嵌入，约 10 分钟
+python scripts/export_persona_demo_html.py
+```
+
+协议里几条定死的口径：
+
+- **班底**：本帖发言 ≥3 条、且在其它采样帖里出现过 ≥2 次的人，按发言量取前 5。两条线都只保留这 5 个人的评论，所以位置、发言人、条数完全一致。
+- **人设料**：目标帖本身从不进入人设，也从不给 agent 看。历史条数、长度分位、版块分布由代码统计，模型只写立场、语气、习惯三项，免得它编数字。
+- **生成**：给原帖标题正文，给已生成的前 k−1 条，不给任何真人评论，不给回复树提示（扁平）。长度按各人自己的历史中位数下指示，token 上限按其 p90 换算。
+- **模型**：`--provider deepseek`（默认）或 `--provider openai --model gpt-5.6-luna`。后者要 `OPENAI_API_KEY`。
+- **运动打分尺度**取自 200 帖那次运行（`--scale-from`），不由这 3 个帖自己定，否则类边界会被 demo 自己改掉。
+- 真名只留在 `outputs/`（已 gitignore），`docs/persona_demo.html` 里只有 `Agent-N`。
+
+`configs/default.yaml` 的 `persona_demo:` 段是全部旋钮（选哪几个帖、班底大小、取料上限、长度换算）。
+
+已知局限写在页面顶部，最要紧的一条是**长度混淆**：模拟评论平均只有真人一半长，所以 σ 和 d 偏低有可能只是文本短，要把真人截到同长再嵌一遍才能排除。
