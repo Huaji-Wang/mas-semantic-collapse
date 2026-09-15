@@ -40,9 +40,10 @@ only the missing threads are embedded.
 
 ## The one rule for centring
 
-Use **one shared reference mean on both sides** — the human Reddit corpus mean
-(`outputs/embeddings/full/corpus_mean.npy`, 628,753 comments) applied unchanged
-to the AutoGen threads too. Centring each side on its own mean would remove the
+Use **one shared reference mean on both sides** — the human Reddit corpus mean,
+committed as `reference/corpus_mean.npy` (628,753 comments; regenerate
+bit-identically with `scripts/corpus_mean.py`), applied unchanged to the AutoGen
+threads too. Centring each side on its own mean would remove the
 human-vs-agent difference the comparison is meant to measure.
 
 Thresholds set on raw geometry (formal-k cutoff 0.55, S_end q80/q20 label cuts)
@@ -56,13 +57,15 @@ unaffected by centring, so its 0.92 gate can stay.
 python scripts/extract_order_params.py --limit 0 --device cuda --allow-laptop-cuda \
     --batch-size 64 --save-embeddings --reuse-embeddings --tag full
 
-# cone measurement + reference mean
+# cone measurement
 python scripts/anisotropy_null.py --emb-dir outputs/embeddings/full --n-pairs 5000
+# reference mean (the shared centring frame; already committed as reference/corpus_mean.npy)
+python scripts/corpus_mean.py --emb-dir outputs/embeddings/full --out reference/corpus_mean.npy
 
 # centred coordinates from the persisted vectors (CPU, minutes)
 python scripts/extract_order_params.py --limit 0 --reuse-embeddings \
     --emb-dir outputs/embeddings/full \
-    --center-mean outputs/embeddings/full/corpus_mean.npy --tag full_centered
+    --center-mean reference/corpus_mean.npy --tag full_centered
 ```
 
 Outputs: `outputs/order_params/order_params_full.jsonl` (raw geometry, comparable
