@@ -1,0 +1,84 @@
+# Six-arm persona replay on the conditioned dump.
+# Same posts, same cards, six generators. Each arm writes to its own directory.
+# This file does not replace configs/default.yaml, and it does not touch
+# outputs/sims/persona_148 or outputs/sims/persona_lenfree.
+#
+# Tiers are parameter scale, two models each. The three vendors are OpenAI,
+# DeepSeek, and Qwen. Six slots cannot put every vendor on every tier;
+# each vendor is assigned two tiers. Model ids are examples until SCALE_*_MODEL
+# is set in .env or `model:` is filled in here.
+#
+# Comment generation turns reasoning off so the token budget is comment text.
+# Cards stay one set, written once; the arm only changes the generator.
+# Analysis uses motion-mixture-v1: ten continuous weights including filamentation.
+# See docs/motion_weights.md and run_pipeline.py --source scale-replay.
+# run_scale_flash.py is a separate fixed-provider protocol; its saved metadata
+# is authoritative for the existing low_deepseek run, not these six-arm defaults.
+
+tag: scale5000
+temperature: 0.9
+disable_thinking: true
+workers: 4
+
+# Limited attention. Indices depend only on post id and step, so six arms
+# share positions and read their own generated text. Order is the original
+# speaking order. Measurement still uses the full generated trajectory.
+history_view:
+  recent: 3
+  earlier: 2
+  seed: 42
+
+# Reply length is part of the protocol. Target is about 50 tokens
+# (200 characters). Hard cap is 128 tokens so a sentence can finish.
+# Short accounts keep their own shorter median. Persona cards for this
+# run are to be compressed to about 100 tokens before the full pass.
+reply_target_chars: 200
+reply_max_tokens: 128
+max_tokens_free: 8192
+
+# Shared with the existing persona protocol. prepare_scale5000.py uses these
+# to mark which dump threads can be replayed. It does not rewrite default.yaml.
+min_thread_comments: 50
+max_thread_comments: 1000
+cast_size: 5
+min_in_thread: 3
+min_cross_threads: 2
+
+arms:
+  - id: high_openai
+    tier: high
+    provider: openai
+    model_env: SCALE_HIGH_OPENAI_MODEL
+    model: ""
+  - id: high_qwen
+    tier: high
+    provider: qwen
+    model_env: SCALE_HIGH_QWEN_MODEL
+    model: ""
+  - id: mid_openai
+    tier: mid
+    provider: openai
+    model_env: SCALE_MID_OPENAI_MODEL
+    model: ""
+  - id: mid_deepseek
+    tier: mid
+    provider: deepseek
+    model_env: SCALE_MID_DEEPSEEK_MODEL
+    model: ""
+  - id: low_deepseek
+    tier: low
+    provider: deepseek
+    model_env: SCALE_LOW_DEEPSEEK_MODEL
+    model: deepseek-flash
+    # Reserved routing metadata. run_scale_arms.py currently uses the provider
+    # above directly and does not apply this block. No routing/price guarantee.
+    route:
+      gateway: openrouter
+      model: deepseek/deepseek-v4.1-flash
+      provider_only: inference-net
+      allow_fallbacks: false
+  - id: low_qwen
+    tier: low
+    provider: qwen
+    model_env: SCALE_LOW_QWEN_MODEL
+    model: ""

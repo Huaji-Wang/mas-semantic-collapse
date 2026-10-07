@@ -15,6 +15,9 @@ data:
   # CONDITIONED_THREADS_PATH / AUTHOR_THREADS_CSV in .env.
   conditioned_threads_path: ../conditioned_threads_2026/conditioned_threads.jsonl.zst
   author_threads_csv: ../conditioned_threads_2026/user_history/author_threads.csv
+  # One jsonl.zst line per author: {author, n_records, records:[{body,...}]}.
+  # Override with USER_HISTORY_PATH.
+  user_history_path: ""
 
 windowing:
   window_size: 10
@@ -59,7 +62,7 @@ metrics:
 
 simulation:
   generator: deepseek
-  model: deepseek-chat
+  model: deepseek-flash
   base_url: https://api.deepseek.com
   temperature: 0.9
   max_tokens: 200
@@ -75,25 +78,192 @@ simulation:
   n_per_class: 50
   n_runs: 1
 
-# Persona demo: replay one real cast on the same post with LLM stand-ins.
-# Human line and sim line both keep cast comments only, same positions, same count.
+# Persona replay: same real cast, same positions. Human and sim keep cast comments only.
+# Active lock: comment cap 1000, same 5×≥3 cast, replies not length-capped.
+# The length-capped 148 remain in outputs/personas/persona_148 and outputs/sims/persona_148.
+# Re-scan with scripts/select_persona_posts.py
 persona_demo:
-  tag: persona_demo
+  tag: persona_lenfree
+  min_thread_comments: 50
+  max_thread_comments: 1000
   posts:
-    - 1sql6fs   # r/asklinguistics,   107 comments, cast writes 66%
-    - 1rd4ske   # r/AskALiberal,       88 comments, cast writes 60%
-    - 1sp4y8z   # r/AskConservatives,  79 comments, cast writes 51%
+    - 1qwp0z8
+    - 1t0w8qr
+    - 1t3ngh5
+    - 1q1b8i9
+    - 1sh96bt
+    - 1re7h1m
+    - 1t7wpub
+    - 1t1pyb6
+    - 1q25gqo
+    - 1q2ma5r
+    - 1rve97q
+    - 1sb4cfe
+    - 1rq6q6w
+    - 1tjvd1z
+    - 1sj55kj
+    - 1saoc2f
+    - 1tre11y
+    - 1stu0jy
+    - 1q7rh4o
+    - 1qsij07
+    - 1q4ap0q
+    - 1sszxs4
+    - 1sbc1z2
+    - 1seihzc
+    - 1qgbbnp
+    - 1sukm87
+    - 1suao54
+    - 1seoei9
+    - 1q0vl4r
+    - 1t0puw9
+    - 1rwgcy1
+    - 1r9ymzk
+    - 1r2xzaa
+    - 1rnmo8h
+    - 1sftzpg
+    - 1s4ga5k
+    - 1tcakka
+    - 1s54oqm
+    - 1q7dikv
+    - 1rnfysg
+    - 1qds5ls
+    - 1svgu9a
+    - 1rlh0b1
+    - 1tmzx4g
+    - 1t4p72x
+    - 1qqz4d7
+    - 1s96f4n
+    - 1t6dos8
+    - 1rqdzjp
+    - 1q8lzd9
+    - 1qa5odw
+    - 1r0ezax
+    - 1s8v65k
+    - 1tmij3p
+    - 1qad1pw
+    - 1rsb0rc
+    - 1s7pmek
+    - 1qq3zzv
+    - 1t6577a
+    - 1r80gpv
+    - 1qfymr9
+    - 1tlv2bp
+    - 1rogj5t
+    - 1qiy56n
+    - 1qrhqr9
+    - 1qwpd2a
+    - 1r3vpg1
+    - 1tgtqwf
+    - 1qu8iuq
+    - 1qglisb
+    - 1r981cp
+    - 1s3h2ah
+    - 1tb7924
+    - 1s6mwnr
+    - 1ry4lzv
+    - 1r3bm8e
+    - 1qln3zq
+    - 1q1ty63
+    - 1qchqur
+    - 1tq9lym
+    - 1redaz0
+    - 1sahduq
+    - 1qlbfe7
+    - 1tdssyz
+    - 1sauh54
+    - 1sje0p4
+    - 1t2cdie
+    - 1r6xp47
+    - 1q8926l
+    - 1r99cfz
+    - 1qeu2dg
+    - 1qt1oms
+    - 1sqo0rh
+    - 1qvtzjt
+    - 1q1o97w
+    - 1qu0jou
+    - 1t1fpci
+    - 1t0g7xu
+    - 1qw122g
+    - 1rysuwc
+    - 1sszuc5
+    - 1tq4ni5
+    - 1r2d35k
+    - 1r8j2g5
+    - 1qv3hai
+    - 1r6jq0c
+    - 1tog603
+    - 1tamgwy
+    - 1szy12x
+    - 1sgp6pa
+    - 1tk2ln3
+    - 1r948kh
+    - 1qnyhls
+    - 1tp6i5g
+    - 1qt4umo
+    - 1ssxhpx
+    - 1q2ff0f
+    - 1q5ymvl
+    - 1rwb0bx
+    - 1r005at
+    - 1swwuay
+    - 1qtchvq
+    - 1qtvqb2
+    - 1qelmcr
+    - 1qxkbif
+    - 1q3jp26
+    - 1r7brof
+    - 1rvxtzu
+    - 1q1e8cr
+    - 1qv4qa7
+    - 1ro118y
+    - 1qkvzny
+    - 1qn903m
+    - 1q5aahc
+    - 1trdbi0
+    - 1qhijid
+    - 1rbb3vn
+    - 1rfzo31
+    - 1qu9yyq
+    - 1rcwxse
+    - 1srh5n3
+    - 1q9h841
+    - 1s1j4s0
+    - 1solb6m
+    - 1tcu303
+    - 1srtho9
+    - 1qd2aic
+    - 1rpv02u
+    - 1qr8d6h
+    - 1qq8729
+    - 1q8usdy
+    - 1qgsw8v
+    - 1s5xn8h
+    - 1t632gh
+    - 1tjimve
+    - 1t5dt9o
+    - 1q5jvcf
+    - 1qzdqvh
+    - 1rq2gnh
+    - 1r1jwf6
+    - 1roisx7
+    - 1qa1cfz
+    - 1s1dbiq
   cast_size: 5
   min_in_thread: 3        # cast must speak at least this often in the demo thread
   min_cross_threads: 2    # and appear in at least this many sampled threads
-  history_max_samples: 15 # cross-thread comments fed to the card writer
+  reuse_cards_from: outputs/personas/persona_demo/cards.json
+  history_max_samples: 40 # comments fed to the card writer (spread by length)
   history_max_chars: 6000
   card_samples: 3         # verbatim snippets pinned into the agent's system prompt
   sample_max_chars: 700
   card_temperature: 0.3
-  chars_per_token: 3.6    # p90 chars -> max_tokens
+  chars_per_token: 3.6    # p90 chars -> max_tokens, used only when limit_reply_length
   max_tokens_floor: 80
   max_tokens_ceil: 900
+  limit_reply_length: false
+  max_tokens_free: 8192   # output ceiling when replies are not length-capped
 
 paths:
   outputs: outputs

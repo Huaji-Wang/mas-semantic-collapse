@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+import hashlib
 from typing import Any, Sequence
 
 import numpy as np
@@ -78,7 +79,7 @@ class HashingEmbedder(Embedder):
     """Deterministic bag-of-words hashing for pipeline smoke tests (not for papers)."""
 
     def __init__(self, dim: int = 256):
-        self.name = f"hashing:{dim}"
+        self.name = f"hashing-sha256:{dim}"
         self.dim = dim
 
     def embed(self, texts: Sequence[str]) -> np.ndarray:
@@ -87,7 +88,8 @@ class HashingEmbedder(Embedder):
         out = np.zeros((len(texts), self.dim), dtype=np.float32)
         for i, text in enumerate(texts):
             for tok in text.lower().split():
-                out[i, hash(tok) % self.dim] += 1.0
+                bucket = int.from_bytes(hashlib.sha256(tok.encode('utf-8')).digest()[:8], 'little')
+                out[i, bucket % self.dim] += 1.0
         return _l2_normalize(out)
 
 

@@ -1,8 +1,9 @@
 """Whole-thread motion labels from the five time series.
 
-One thread, one class. Each teacher-table row is scored by how well the
-whole trajectories match its arrows; the highest score wins. Filamentation
-is not scored. Chi is the new polar series, k is range-cluster count.
+Legacy classifier: the default pipeline uses classify_motion_weights.py.
+The teacher table has ten rows. This scorer matches nine and takes argmax.
+Filamentation (成丝: effective dimension falls) is not given a score, so a
+thread is never labeled filamentation here.
 
     python scripts/classify_thread_motions.py --tag chik200
 """
@@ -92,7 +93,10 @@ def _signed(delta: float, scale: float) -> tuple[float, float]:
     if not np.isfinite(delta) or scale <= 1e-12:
         return 0.0, 0.0
     z = delta / scale
-    return float(1.0 / (1.0 + np.exp(-z))), float(1.0 / (1.0 + np.exp(z)))
+    # Large finite deltas legitimately saturate the sigmoid at zero/one.
+    # Keep the historical arithmetic (and report values) without overflow noise.
+    with np.errstate(over="ignore"):
+        return float(1.0 / (1.0 + np.exp(-z))), float(1.0 / (1.0 + np.exp(z)))
 
 
 def _dip_recover(y: np.ndarray) -> float:

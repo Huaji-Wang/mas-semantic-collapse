@@ -31,6 +31,7 @@ def load_config(path: str | Path | None = None) -> dict[str, Any]:
     for key, env_var in (
         ("conditioned_threads_path", "CONDITIONED_THREADS_PATH"),
         ("author_threads_csv", "AUTHOR_THREADS_CSV"),
+        ("user_history_path", "USER_HISTORY_PATH"),
     ):
         override = os.getenv(env_var, "").strip()
         raw = override or cfg["data"].get(key)
@@ -56,7 +57,7 @@ def load_config(path: str | Path | None = None) -> dict[str, Any]:
         "DEEPSEEK_BASE_URL", cfg["simulation"].get("base_url", "https://api.deepseek.com")
     )
     cfg["simulation"]["model"] = os.getenv(
-        "DEEPSEEK_MODEL", cfg["simulation"].get("model", "deepseek-chat")
+        "DEEPSEEK_MODEL", cfg["simulation"].get("model", "deepseek-flash")
     )
     cfg["embedding"]["openai_api_key"] = os.getenv("OPENAI_API_KEY", "")
     cfg["embedding"]["openai_model"] = os.getenv(

@@ -340,7 +340,7 @@ def _label_with_deepseek(cfg: dict, clusters: list[dict]) -> list[dict]:
         api_key=key,
         base_url=cfg["simulation"].get("base_url") or "https://api.deepseek.com",
     )
-    model = cfg["simulation"].get("model") or "deepseek-chat"
+    model = cfg["simulation"].get("model") or "deepseek-flash"
     for c in clusters:
         exemplars = [e["title"] for e in c.get("exemplars", [])]
         words = ", ".join(c.get("keywords", []))

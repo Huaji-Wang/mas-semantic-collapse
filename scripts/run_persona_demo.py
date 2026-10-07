@@ -7,6 +7,7 @@ human comment, and no reply-tree hint (flat).
 
     python scripts/run_persona_demo.py                    # DeepSeek, resumable
     python scripts/run_persona_demo.py --provider openai --model gpt-5.6-luna
+    python scripts/run_persona_demo.py --provider qwen --model qwen-plus
     python scripts/run_persona_demo.py --limit 5          # short smoke per thread
 """
 
@@ -31,6 +32,7 @@ from mas_collapse.simulate.persona import (
     agent_system_prompt,
     agent_user_prompt,
     max_tokens_for,
+    visible_history_indices,
 )
 
 
@@ -59,6 +61,15 @@ def run_one_thread(
     ceil: int,
     limit: int,
     retries: int,
+    history_source: str,
+    limit_length: bool = True,
+    free_max_tokens: int = 8192,
+    disable_thinking: bool | None = None,
+    arm: str = "",
+    tier: str = "",
+    history_view: dict | None = None,
+    reply_max_tokens: int | None = None,
+    reply_target_chars: int | None = None,
 ) -> dict:
     turns = thread["turns"]
     if limit:
@@ -68,32 +79,78 @@ def run_one_thread(
         "post_id": thread["post_id"],
         "subreddit": thread["subreddit"],
         "title": thread["title"],
+        "provider": client.provider,
         "provider_model": client.model,
+        "arm": arm,
+        "tier": tier,
+        "history_view": history_view or {},
         "temperature": temperature,
-        "protocol": "cast-only replay; post visible; generated history only; flat",
+        "protocol": (
+            "limited history recent+random; post visible; own generated text"
+            if history_view
+            else "cast-only replay; post visible; generated history only; flat"
+        ),
+        "history_source": history_source,
+        "length_limit": limit_length,
         "n_turns": len(turns),
         "human": turns,
         "generated": [],
     }
     if out_path.exists():
         prev = json.loads(out_path.read_text(encoding="utf-8"))
-        if prev.get("provider_model") == client.model and prev.get("n_turns") == len(turns):
+        if (
+            prev.get("provider_model") == client.model
+            and (not arm or prev.get("arm", arm) == arm)
+            and prev.get("n_turns") == len(turns)
+            and prev.get("history_source") == history_source
+            and bool(prev.get("length_limit", True)) == limit_length
+            and (not history_view or prev.get("history_view") == history_view)
+        ):
             payload = prev
     done = len(payload["generated"])
 
     system_cache = {
-        a: agent_system_prompt(c, thread["subreddit"]) for a, c in cards.items() if a in thread["cast"]
+        a: agent_system_prompt(c, limit_length=limit_length)
+        for a, c in cards.items()
+        if a in thread["cast"]
     }
-    budget = {
-        a: max_tokens_for(c.stats, chars_per_token, floor, ceil) for a, c in cards.items() if a in thread["cast"]
-    }
-    target = {a: c.stats.len_median for a, c in cards.items() if a in thread["cast"]}
+    if limit_length:
+        budget = {
+            a: max_tokens_for(c.stats, chars_per_token, floor, ceil)
+            for a, c in cards.items()
+            if a in thread["cast"]
+        }
+        target = {a: c.stats.len_median for a, c in cards.items() if a in thread["cast"]}
+    else:
+        budget = {a: free_max_tokens for a in thread["cast"]}
+        target = {a: None for a in thread["cast"]}
+    if reply_max_tokens:
+        budget = {a: int(reply_max_tokens) for a in thread["cast"]}
+    if reply_target_chars is not None:
+        target = {}
+        for a in thread["cast"]:
+            med = cards[a].stats.len_median if a in cards else 0
+            target[a] = min(med, int(reply_target_chars)) if med else int(reply_target_chars)
 
     for i in range(done, len(turns)):
         turn = turns[i]
         author = turn["author"]
+        shown = None
+        if history_view:
+            shown = visible_history_indices(
+                len(payload["generated"]),
+                recent=int(history_view["recent"]),
+                earlier=int(history_view["earlier"]),
+                seed=int(history_view["seed"]),
+                post_id=thread["post_id"],
+                step=i,
+            )
         user = agent_user_prompt(
-            thread["title"], thread["selftext"], payload["generated"], target[author]
+            thread["title"],
+            thread["selftext"],
+            payload["generated"],
+            target[author],
+            indices=shown,
         )
         body, err = "", ""
         for attempt in range(retries + 1):
@@ -103,6 +160,7 @@ def run_one_thread(
                     user,
                     max_tokens=budget[author],
                     temperature=temperature,
+                    disable_thinking=disable_thinking,
                 )
                 if body:
                     err = ""
@@ -119,6 +177,7 @@ def run_one_thread(
                 "body": body,
                 "n_chars": len(body),
                 "human_n_chars": turn["n_chars"],
+                "shown_indices": shown,
                 "error": err,
             }
         )
@@ -131,7 +190,7 @@ def run_one_thread(
 def main() -> None:
     ap = argparse.ArgumentParser(description="Replay persona-demo casts with an LLM")
     ap.add_argument("--config", default="configs/default.yaml")
-    ap.add_argument("--provider", default="deepseek", choices=["deepseek", "openai"])
+    ap.add_argument("--provider", default="deepseek", choices=["deepseek", "openai", "qwen"])
     ap.add_argument("--model", default=None)
     ap.add_argument("--temperature", type=float, default=0.9)
     ap.add_argument("--limit", type=int, default=0, help="cap turns per thread (smoke)")
@@ -146,6 +205,7 @@ def main() -> None:
     raw = json.loads((persona_dir / "cast_and_history.json").read_text(encoding="utf-8"))
     cards_blob = json.loads((persona_dir / "cards.json").read_text(encoding="utf-8"))
     cards = {a: _card_from_dict(d) for a, d in cards_blob["cards"].items()}
+    history_source = cards_blob.get("history_source") or "unspecified"
 
     out_dir = Path(cfg["paths"]["sims"]) / tag
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -171,6 +231,9 @@ def main() -> None:
                     ceil=int(pd_cfg["max_tokens_ceil"]),
                     limit=args.limit,
                     retries=args.retries,
+                    history_source=history_source,
+                    limit_length=bool(pd_cfg.get("limit_reply_length", True)),
+                    free_max_tokens=int(pd_cfg.get("max_tokens_free", 8192)),
                 )
             )
         results = [j.result() for j in jobs]

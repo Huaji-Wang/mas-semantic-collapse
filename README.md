@@ -1,5 +1,7 @@
 # mas-semantic-collapse
 
+**Current analysis:** the default [pipeline](docs/pipeline.md) uses ten continuous motion weights (`motion-mixture-v1`), including filamentation. See the [scoring standard](docs/motion_weights.md) for exact rules, normalization, and limitations. Full-position human/simulation replay is supported; generated data remain local.
+
 多人（或多个模型）接着聊时，意思会不会越来越窄、越来越像开场那几句？本项目把一场评论区讨论写成语义空间里的一团点，跟踪这团点怎么动；人类 Reddit 帖是对照，多智能体互相接话是实验对象。
 
 只看「聊到最后还像不像开头」会把不同过程标成同一类。有的帖几乎没离开开场，有的绕一圈又回来，两者期末都可以很像开头；有的搬走后停住，有的还在往下掉，两者期末都可以不像开头。要区分这些过程，需要五个互相不蕴含的量。
