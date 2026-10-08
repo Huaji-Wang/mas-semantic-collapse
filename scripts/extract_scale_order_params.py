@@ -56,6 +56,61 @@ def iter_pairs(replay,sims,limit=0):
             yield thread,None,None,None,str(exc)
 
 
+def _text_sha(texts):
+    return [hashlib.sha256(t.encode('utf-8')).hexdigest()[:16] for t in texts]
+
+
+def _seed_index(seed_dir):
+    """comment_id -> npz path, over <post_id>.npz written by extract_order_params.py --save-embeddings."""
+    index={}
+    for f in sorted(Path(seed_dir).glob('*.npz')):
+        z=np.load(f,allow_pickle=False)
+        for cid in z['comment_ids'].tolist():index.setdefault(str(cid),f)
+    return index
+
+
+def _side_vectors(get_model,comments,side,tid,store,seed,seed_name,counts):
+    """Raw (uncentred) vectors for one side of one thread.
+
+    Order of preference: the thread's own stored file (only if every comment text
+    is unchanged), then seed vectors by comment_id (human side only), then the
+    embedder. Returns (vectors, embedder_name). With store=None and seed=None this
+    is exactly model.embed(bodies)."""
+    texts=[r['body'] for r in comments];sha=_text_sha(texts)
+    path=store/f'{tid}_{side}.npz' if store is not None else None
+    if path is not None and path.exists():
+        z=np.load(path,allow_pickle=False)
+        if z['text_sha'].tolist()==sha:
+            counts['stored']+=len(texts);return z['embs'].astype(np.float32),str(z['embedder'])
+    vecs=[None]*len(texts);name=None
+    if seed is not None and side=='human':
+        by_file={}
+        for i,r in enumerate(comments):
+            f=seed.get(str(r['comment_id']))
+            if f is not None:by_file.setdefault(f,[]).append(i)
+        for f,rows in by_file.items():
+            z=np.load(f,allow_pickle=False)
+            if str(z['embedder'])!=seed_name:raise ValueError(f'{f}: embedder {z["embedder"]} != {seed_name}')
+            pos={str(c):j for j,c in enumerate(z['comment_ids'].tolist())};e=z['embs']
+            for i in rows:vecs[i]=np.asarray(e[pos[str(comments[i]['comment_id'])]],dtype=np.float32)
+        name=seed_name if by_file else None
+        counts['seeded']+=sum(v is not None for v in vecs)
+    missing=[i for i,v in enumerate(vecs) if v is None]
+    if missing:
+        model=get_model();fresh=np.asarray(model.embed([texts[i] for i in missing]),dtype=np.float32)
+        for k,i in enumerate(missing):vecs[i]=fresh[k]
+        if name is not None and name!=model.name:raise ValueError(f'seed embedder {name} != model {model.name}')
+        name=model.name;counts['embedded']+=len(missing)
+    e=np.stack(vecs).astype(np.float32)
+    if path is not None:
+        part=path.with_name(path.name+'.tmp')
+        with open(part,'wb') as fh:
+            np.savez(fh,embs=e,comment_ids=np.asarray([str(r['comment_id']) for r in comments]),
+                     text_sha=np.asarray(sha),embedder=np.asarray(name))
+        part.replace(path)
+    return e,name
+
+
 def main():
     ap=argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--replay',type=Path,default=ROOT/'outputs/scale5000/replay.jsonl')
@@ -74,6 +129,12 @@ def main():
     ap.add_argument('--window-size',type=int,default=10)
     ap.add_argument('--support-size',type=int,default=30)
     ap.add_argument('--cluster-distance',type=float,default=.55)
+    ap.add_argument('--vector-store',type=Path,default=None,
+                    help='[patch] persist raw per-thread, per-side comment vectors here and reuse them on later runs '
+                         'when every comment text is unchanged (re-measuring then needs no embedder)')
+    ap.add_argument('--seed-vectors',type=Path,default=None,
+                    help='[patch] dir of <post_id>.npz from extract_order_params.py --save-embeddings; human comments '
+                         'found there by comment_id reuse those vectors (same embedder required)')
     args=ap.parse_args()
     if args.limit<0 or args.window_size<1 or args.support_size<args.window_size:raise ValueError('Invalid limit/window/support size')
     audit={'valid_pairs':0,'comments_per_side':0,'truncated_sim_comments':0,'excluded':[],
@@ -102,6 +163,18 @@ def main():
     out=args.output or ROOT/f'outputs/order_params/order_params_{args.tag}.jsonl'
     out.parent.mkdir(parents=True,exist_ok=True);cache=out.parent/(out.stem+'_cache');cache.mkdir(exist_ok=True)
     model=None;written=reused=0;tmp=out.with_suffix(out.suffix+'.tmp')
+    def get_model():
+        nonlocal model
+        if model is None:model=build_embedder(cfg)
+        return model
+    store=args.vector_store
+    if store is not None:store.mkdir(parents=True,exist_ok=True)
+    seed=seed_name=None
+    if args.seed_vectors is not None:
+        if cfg['embedding'].get('backend','bge_m3') not in ('bge_m3','bge-m3'):raise SystemExit('--seed-vectors requires the bge_m3 backend')
+        seed_name=f"bge_m3:{cfg['embedding'].get('model_name','BAAI/bge-m3')}"
+        seed=_seed_index(args.seed_vectors);print(f'[patch] seed index: {len(seed):,} comment vectors from {args.seed_vectors}',flush=True)
+    counts={'stored':0,'seeded':0,'embedded':0}
     with tmp.open('w',encoding='utf-8') as stream:
         for t,h,s,m,error in iter_pairs(args.replay,args.sims_dir,args.limit):
             if error or len(h or [])<=args.window_size:continue
@@ -109,25 +182,25 @@ def main():
             checkpoint=cache/f'{t["post_id"]}.json';stored=json.loads(checkpoint.read_text(encoding='utf-8')) if checkpoint.exists() else {}
             if stored.get('fingerprint')==fingerprint:rows=stored['rows'];reused+=1
             else:
-                if model is None:model=build_embedder(cfg)
                 rows=[]
                 for side,comments in [('human',h),('sim',s)]:
-                    e=np.asarray(model.embed([r['body'] for r in comments]),dtype=np.float32)
+                    e,emb_name=_side_vectors(get_model,comments,side,t['post_id'],store,seed,seed_name,counts)
                     if mu is not None:
                         if e.shape[1]!=len(mu):raise ValueError('Reference-mean dimension does not match embedder')
                         e=e-mu;e=e/np.maximum(np.linalg.norm(e,axis=1,keepdims=True),1e-12)
                     trajectory=extract_order_params(e,window_size=args.window_size,support_size=args.support_size,cluster_distance=args.cluster_distance)
                     rows.append({'post_id':f'{t["post_id"]}_{side}','thread_id':t['post_id'],'side':side,
                                  'title':t.get('title',''),'subreddit':t.get('subreddit'),'n_comments':len(comments),
-                                 'embedder':model.name,'center_mean':None if mu is None else settings['center_sha256'],
+                                 'embedder':emb_name,'center_mean':None if mu is None else settings['center_sha256'],
                                  'measurement_settings':settings,'source_fingerprint':fingerprint,
                                  **trajectory,**summarize_order_params(trajectory,late_windows=3)})
                 part=checkpoint.with_suffix('.json.tmp');part.write_text(json.dumps({'fingerprint':fingerprint,'rows':rows},ensure_ascii=False)+'\n',encoding='utf-8');part.replace(checkpoint)
             for r in rows:stream.write(json.dumps(r,ensure_ascii=False)+'\n')
             stream.flush();written+=1
-            if written%25==0:print(f'measured pairs={written}; reused={reused}',flush=True)
+            if written%25==0:print(f'measured pairs={written}; reused={reused}; vectors={counts}',flush=True)
     tmp.replace(out)
-    print(json.dumps({'paired_threads':written,'reused_pairs':reused,'trajectories':written*2,'output':str(out)}))
+    print(json.dumps({'paired_threads':written,'reused_pairs':reused,'trajectories':written*2,'vectors':counts,
+                      'model_loaded':model is not None,'output':str(out)}))
 
 
 if __name__=='__main__':main()
